@@ -1,9 +1,9 @@
 const bool ENCENDIDO = HIGH;
 const bool APAGADO = LOW;
 const long interval = 1000;  // interval at which to blink (milliseconds)
-const int carga_actuador_enchufe = 8; // Nº del pin que se quiere usar como salida
+const int carga_actuador_enchufe = 15; // Nº del pin que se quiere usar como salida
 
-int estado_carga_actuador_enchufe = APAGADO;  
+int estado_carga_actuador_enchufe = ENCENDIDO;  
 unsigned long previousMillis = 0;  // unsigned para variables que guardan tiempo
 int vueltas;
 
