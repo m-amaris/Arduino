@@ -1,42 +1,45 @@
-const int ledPin = 13;    // Pin al que está conectado el LED
-const int buttonPin = 2;  // Pin al que está conectado el pulsador
-int ledState = LOW;       // Estado inicial del LED (apagado)
-int lastButtonState = LOW; // Estado del pulsador en la última lectura
-int buttonState;          // Estado actual del pulsador
-unsigned long lastDebounceTime = 0;  // Último tiempo en que se leyó el pulsador
-unsigned long debounceDelay = 50;    // Tiempo de debounce (evita lecturas falsas)
+// Actuador de Interruptor v2
+
+// Constantes para el actuador de interruptor
+const bool ENCENDIDO = HIGH;
+const bool APAGADO = LOW;
+const int pin_carga_actuador_interruptor = 13;	// Pin al que está conectado el LED
+const int pinPulsadorInterruptor = 2;   // Pin al que está conectado el pulsador de interruptor
+const int tiempoDebounce = 50;          // Tiempo de debounce en milisegundos
+const int estadoPulsado = APAGADO;          // Estado del pulsador cuando está presionado
+
+// Variables para el actuador de interruptor
+int estadoLed = APAGADO;          // Estado actual del LED (apagado)
+int ultimoEstadoPulsador = ENCENDIDO; // Estado del pulsador en la última lectura
+unsigned long ultimoTiempoDebounce = 0;  // Último tiempo en que se leyó el pulsador
 
 void setup() {
-  pinMode(ledPin, OUTPUT);
-  pinMode(buttonPin, INPUT_PULLUP);
+  pinMode(pin_carga_actuador_interruptor, OUTPUT);
+  pinMode(pinPulsadorInterruptor, INPUT_PULLUP); // Habilitar la resistencia pull-up interna
+  Serial.begin(115200); // Iniciar la comunicación serial
 }
 
 void loop() {
-  // Lee el estado del pulsador y aplica debounce
-  int reading = digitalRead(buttonPin);
-  if (reading != lastButtonState) {
-    lastDebounceTime = millis();
+  int lecturaPulsador = digitalRead(pinPulsadorInterruptor);
+  
+  // Verificar el estado del pulsador con debounce
+  if (lecturaPulsador != ultimoEstadoPulsador) {
+    ultimoTiempoDebounce = millis();
   }
 
-  if ((millis() - lastDebounceTime) > debounceDelay) {
-    if (reading != buttonState) {
-      buttonState = reading;
-      // Si el estado del pulsador cambió, realiza la acción
-      if (buttonState == LOW) {
-        // El pulsador ha sido presion
-        // El pulsador ha sido presionado
-        if (ledState == LOW) {
-          // Si el LED está apagado, enciéndelo
-          ledState = HIGH;
-        } else {
-          // Si el LED está encendido, apágalo
-          ledState = LOW;
-        }
-        digitalWrite(ledPin, ledState);
+  if ((millis() - ultimoTiempoDebounce) > tiempoDebounce) {
+    if (lecturaPulsador != estadoPulsado) {
+      if (estadoLed == APAGADO) {
+        estadoLed = ENCENDIDO;
+        Serial.println("LED encendido");
+      } else {
+        estadoLed = APAGADO;
+        Serial.println("LED apagado");
       }
+      digitalWrite(pin_carga_actuador_interruptor, estadoLed);
     }
   }
-
-  // Guarda el estado actual del pulsador para la próxima comparación
-  lastButtonState = reading;
+  
+  // Actualizar el estado anterior del pulsador
+  ultimoEstadoPulsador = lecturaPulsador;
 }
