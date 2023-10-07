@@ -1,10 +1,9 @@
-/* Grupo X
-Alumnos: AAAA y BBBBB
+/* Grupo 8
+Alumnos: ESTEBAN y MIGUEL
 Multiactuador básico de la práctica 0, compuesto por un actuador de enchufe y un actuador de interruptor.
 El actuador de enchufe tiene conectado como carga un led blanco, y para simular su funcionamiento, se enciende y apaga a intevalos regulares.
-El actuador de interruptor tiene conectado como carga un led rojo, que es activado por un relé. Mediante un se activa/desactiva la carga.
+El actuador de interruptor tiene conectado como carga un led rojo, que es activado por un relé, mediante el cual se activa/desactiva la carga.
 */
-//#include XXXXX
 
 /* Definición de constantes COMUNES */
 #define SI true
@@ -13,27 +12,18 @@ El actuador de interruptor tiene conectado como carga un led rojo, que es activa
 #define APAGADO LOW
 
 /* Definición de constantes y variables del ACTUADOR DE ENCHUFE */
-const int pin_carga_actuador_enchufe = 15;
-#define APAGADO_ENCHUFE LOW
-bool estado_carga_actuador_enchufe = APAGADO;
-const long intervalEncendido = 2000;  // LED encendido durante 2 segundos
-const long intervalApagado = 1000;    // LED apagado durante 1 segundo
-//const long intervalo = 1000;  // intervalo en el que parpadea(milisegundos)
-unsigned long previousMillis = 0;  // unsigned para variables que guardan tiempo
+const int pin_carga_actuador_enchufe = 15; // Pin al que esta conectado la carga
+const long intervalo_encendido = 2000; // Encendido durante 2 segundos
+const long intervalo_apagado = 1000; // Apagado durante 1 segundo
+unsigned long tiempo_previo = 0; // Unsigned para variables que guardan tiempo, almacena el tiempo en el que se realizó el último cambio de estado
+bool estado_carga_actuador_enchufe = APAGADO; // Estado inicial de la carga (apagado)
 
 /* Definición de constantes y variables del ACTUADOR DE INTERRUPTOR*/
-const int carga_actuador_enchufe = 13;        // Nº del pin que se quiere usar como salida
-const int pinPulsadorInterruptor = 5;         // Pin al que está conectado el pulsador de interruptor
-
-int estadoLed = APAGADO;                      // Estado inicial del LED (apagado)
-int estadoPulsadorAnterior = ENCENDIDO;       // Estado anterior del pulsador (inicializado a alto)
-bool pulsadorEstaPresionado = NO;             // Variable para rastrear si el pulsador está presionado
-
-
-//const int pin_carga_actuador_interruptor = 12;
-//const int pin_rele_actuador_interruptor = 13;
-//const int pin_pulsador_interruptor = 15;
-//bool estado_carga_actuador_interruptor = APAGADO;
+const int pin_rele_actuador_interruptor = 13; // Pin al que esta conectado la carga
+const int pin_pulsador_interruptor = 5; // Pin al que está conectado el pulsador de interruptor
+bool estado_anterior_pulsador = ENCENDIDO; // Estado anterior del pulsador (inicializado a alto)
+bool estado_carga_actuador_interruptor = APAGADO; // Estado inicial de la carga (apagado)
+bool pulsador_estaba_presionado = NO; // Variable para rastrear si el pulsador está presionado
 
 void setup() {
   Serial.begin(115200);
@@ -52,50 +42,49 @@ void setup_actuador_enchufe() {
 
 void setup_actuador_interruptor() {
   Serial.println("Inicializando el actuador de interruptor ");
-  pinMode(carga_actuador_enchufe, OUTPUT);
-  pinMode(pinPulsadorInterruptor, INPUT_PULLUP); // Utiliza resistencia pull-up interna
+  pinMode(pin_rele_actuador_interruptor, OUTPUT);
+  pinMode(pin_pulsador_interruptor, INPUT_PULLUP); // Utiliza resistencia pull-up interna
   Serial.println("hecho.");
 }
 
 void loop() {
-  // Código común a ambos actuadores 1oop_actuador_enchufe();
+  // Código común a ambos actuadores
   loop_actuador_interruptor();
   loop_actuador_enchufe();
 }
 
 void loop_actuador_enchufe() {
-  unsigned long currentMillis = millis();
+  unsigned long tiempo_actual = millis(); // Almacena cuanto tiempo ha pasado desde el último estado  
 
-  if (estado_carga_actuador_enchufe == APAGADO && currentMillis - previousMillis >= intervalApagado) {
-    estado_carga_actuador_enchufe = ENCENDIDO;
-    previousMillis = currentMillis;  // Guarda el tiempo actual
+  if (estado_carga_actuador_enchufe == APAGADO && tiempo_actual - tiempo_previo >= intervalo_apagado) {
+    estado_carga_actuador_enchufe = ENCENDIDO; // Cambia el estado del actuador
+    tiempo_previo = tiempo_actual; // Guarda el tiempo actual
     Serial.println("Enciendo");
     digitalWrite(pin_carga_actuador_enchufe, estado_carga_actuador_enchufe);
 
-  } else if (estado_carga_actuador_enchufe == ENCENDIDO && currentMillis - previousMillis >= intervalEncendido) {
-    estado_carga_actuador_enchufe = APAGADO;
-    previousMillis = currentMillis;  // Guarda el tiempo actual
+  } else if (estado_carga_actuador_enchufe == ENCENDIDO && tiempo_actual - tiempo_previo >= intervalo_encendido) {
+    estado_carga_actuador_enchufe = APAGADO; // Cambia el estado del actuador
+    tiempo_previo = tiempo_actual; // Guarda el tiempo actual
     Serial.println("Apago\n");
     digitalWrite(pin_carga_actuador_enchufe, estado_carga_actuador_enchufe);
   }
 }
 
-
 void loop_actuador_interruptor() {
-  int estadoDelPulsador = digitalRead(pinPulsadorInterruptor); //Almacena en una variable el si el pulsador esta pulsado o no
-  
+  int estado_pulsador = digitalRead(pin_pulsador_interruptor); // Almacena en una variable el si el pulsador está pulsado o no
+
   // Si el pulsador se presiona y no estaba presionado previamente, enciende el actuador
-  if (estadoDelPulsador == APAGADO && estadoPulsadorAnterior == ENCENDIDO && !pulsadorEstaPresionado) {
-    estadoLed = !estadoLed;                          // Cambia el estado del actuador
-    pulsadorEstaPresionado = SI;                     // Marca que el pulsador está presionado
-    digitalWrite(carga_actuador_enchufe, estadoLed); // Aplica el cambio al actuador
-    Serial.println(estadoLed == ENCENDIDO ? "LED encendido" : "LED apagado");
-  }
-  
-  // Si el pulsador se suelta, marca que el pulsador ya no está presionado
-  if (estadoDelPulsador == ENCENDIDO && pulsadorEstaPresionado) {
-    pulsadorEstaPresionado = NO;
+  if (estado_pulsador == APAGADO && estado_anterior_pulsador == ENCENDIDO && !pulsador_estaba_presionado) {
+    estado_carga_actuador_interruptor = !estado_carga_actuador_interruptor; // Cambia el estado del actuador
+    pulsador_estaba_presionado = SI; // Marca que el pulsador está presionado
+    digitalWrite(pin_rele_actuador_interruptor, estado_carga_actuador_interruptor); // Aplica el cambio al actuador
+    Serial.println(estado_carga_actuador_interruptor == ENCENDIDO ? "LED encendido" : "LED apagado");
   }
 
-  estadoPulsadorAnterior = estadoDelPulsador;        // Guarda el estado actual del pulsador para la próxima comparación
+  // Si el pulsador se suelta, marca que el pulsador ya no está presionado
+  if (estado_pulsador == ENCENDIDO && pulsador_estaba_presionado) {
+    pulsador_estaba_presionado = NO;
+  }
+
+  estado_anterior_pulsador = estado_pulsador; // Guarda el estado actual del pulsador para la próxima comparación
 }
