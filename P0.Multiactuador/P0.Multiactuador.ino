@@ -20,7 +20,7 @@ bool estado_carga_actuador_enchufe = APAGADO; // Estado inicial de la carga (apa
 
 /* Definición de constantes y variables del ACTUADOR DE INTERRUPTOR*/
 const int pin_rele_actuador_interruptor = 13; // Pin al que esta conectado la carga
-const int pin_pulsador_interruptor = 5; // Pin al que está conectado el pulsador de interruptor
+const int pin_pulsador_interruptor = 0; // Pin al que está conectado el pulsador de interruptor
 bool estado_anterior_pulsador = ENCENDIDO; // Estado anterior del pulsador (inicializado a alto)
 bool estado_carga_actuador_interruptor = APAGADO; // Estado inicial de la carga (apagado)
 bool pulsador_estaba_presionado = NO; // Variable para rastrear si el pulsador está presionado
