@@ -5,64 +5,58 @@ El actuador de enchufe tiene conectado como carga un led blanco, y para simular 
 El actuador de interruptor tiene conectado como carga un led rojo, que es activado por un relé, mediante el cual se activa/desactiva la carga.
 */
 
-#include <ESP8266WiFi.h>       // biblioteca wifi de esp8266
-#include <ESP8266WebServer.h>  // Servidor web
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
 
 // Definición de constantes
-#define ENCENDER HIGH
-#define APAGAR LOW
-// Relé (Interruptor)
-#define PINPULSADOR_INTERRUPTOR 0  // Pin al que está conectado el pulsador de interruptor
-#define PINRELE_INTERRUPTOR 13     // Pin donde irá conectado el relé
-#define PINCARGA_ENCHUFE 15
-#define PINCARGA_PERSIANA_BAJAR 5
-#define PINCARGA_PERSIANA_SUBIR 4
+const int ESTADO_APAGADO = LOW;
+const int ESTADO_ENCENDIDO = HIGH;
+const int PULSADOR_ESTADO_APAGADO = HIGH; // PullUp
+const int PULSADOR_ESTADO_ENCENDIDO = LOW; // PullUp
 
-//Enchufe
-bool estado_carga_actuador_enchufe = APAGAR;
-// Interruptor
-bool estado_anterior_pulsador = ENCENDER;         // Estado anterior del pulsador (inicializado a alto)
-bool estado_carga_actuador_interruptor = APAGAR;  // Estado inicial de la carga (apagado)
-bool pulsador_estaba_presionado = false;          // Variable para rastrear si el pulsador está presionado
-//Persiana
-byte estado_carga_actuador_persinana = 0;
-// Parámetros de la red wifi
-const char* ssid = "LABDTE";
-const char* password = "envev1d0s";
-//IPAddress wifiIP(10, 49, 33, 81);   // IP fija 10.49.33.81
-IPAddress wifiIP(192, 168, 137, 252);  // IP fija 10.49.33.81
-IPAddress wifiNET(255, 254, 0, 0);     // Máscara de red (/15)
-IPAddress wifiON(10, 48, 0, 1);        // Puerta de enlace
+// Pines de actuadores
+const int PIN_ENCHUFE = 15;
+const int PIN_INTERRUPTOR = 13;
+const int PIN_PERSIANA_SUBIR = 5;
+const int PIN_PERSIANA_BAJAR = 4;
+const int PIN_PULSADOR_INTERRUPTOR = 0;
 
-// Objecto servidor
-ESP8266WebServer servidorWeb(80);
+// Variables de estado
+bool estadoEnchufe = ESTADO_APAGADO;
+bool estadoInterruptor = ESTADO_APAGADO;
+bool estadoPrevioPulsador = ESTADO_APAGADO;
+int estadoPersiana = 0;  // 0 - Parar, 1 - Subir, 2 - Bajar
 
-void setup_actuador_enchufe() {
-  pinMode(PINCARGA_ENCHUFE, OUTPUT);       // Configurar pin como salida
-  digitalWrite(PINCARGA_ENCHUFE, APAGAR);  // Apagar pin de carga de enchufe
+// Otras variables
+bool pulsadorEstabaPresionado = false;
+
+// Variables de WIFI
+//const char* ssid = "LABDTE";
+//const char* password = "envev1d0s";
+const char* ssid     = "ASUS"; // Establecer SSID red WiFi de tu casa 
+const char* password = "VIVAlosQUINTOSdel70!!!"; // Establecer contraseña red WiFi de tu casa
+//IPAddress wifiIP(192, 168, 137, 252);
+//IPAddress wifiNET(255, 254, 0, 0);
+//IPAddress wifiON(10, 48, 0, 1);
+IPAddress wifiIP(192, 168, 1, 232);  // IP que se asignará al microcontrolador (debe ser una IP sin uso en la red)
+IPAddress wifiNET (255, 255, 255, 0); // Máscara de Red
+IPAddress wifiON (192, 168, 1, 1); // Dirección IP del router 
+ESP8266WebServer server(80);
+
+void setupActuadores() {
+  pinMode(PIN_ENCHUFE, OUTPUT);
+  pinMode(PIN_INTERRUPTOR, OUTPUT);
+  pinMode(PIN_PERSIANA_SUBIR, OUTPUT);
+  pinMode(PIN_PERSIANA_BAJAR, OUTPUT);
+  pinMode(PIN_PULSADOR_INTERRUPTOR, INPUT_PULLUP); 
 }
 
-void setup_actuador_interruptor() {
-  pinMode(PINRELE_INTERRUPTOR, OUTPUT);       // Configurar pin como salida
-  digitalWrite(PINRELE_INTERRUPTOR, APAGAR);  // Desactivar pin de carga (relé) del interruptor
-}
-
-void setup_actuador_persiana() {
-  pinMode(PINCARGA_PERSIANA_BAJAR, OUTPUT);       // Configurar pin como salida
-  pinMode(PINCARGA_PERSIANA_SUBIR, OUTPUT);       // Configurar pin como salida
-  digitalWrite(PINCARGA_PERSIANA_SUBIR, APAGAR);  // Apagar pin de carga de subida
-  digitalWrite(PINCARGA_PERSIANA_BAJAR, APAGAR);  // Apagar pin de carga de bajada
-}
-
-void setup(void) {
-  setup_actuador_enchufe();
-  setup_actuador_interruptor();
-  setup_actuador_persiana();
-  Serial.begin(115200); // Establecer velocidad consola serie
-  conectar_WIFI();   //Conexion WIFI
-  configura_ServidorWEB(); // Configuración del servidor web:
-  servidorWeb.begin(); // Arrancar servidor web
-  // PENDIENTE DE EDICION
+void setup() {
+  setupActuadores();
+  Serial.begin(115200);
+  conectarWifi();
+  configurarServidorWeb();
+  server.begin();
   Serial.println("Servidor web arrancado");
   Serial.println("Listo. Conectarse a un navegador y usar estas URLs:");
   Serial.print("Para activar: ");
@@ -73,42 +67,19 @@ void setup(void) {
   Serial.println("/desactivar");
 }
 
-void loop(void) {
-  servidorWeb.handleClient(); // Consultar si se ha recibido una petición al servidor web
-  loop_actuador_interruptor();
-  loop_actuador_persiana();
-  loop_pin_handler();
+void loop() {
+  server.handleClient();
+  loopActuadorEnchufe();
+  loopActuadorInterruptor();
+  loopActuadorPersiana();
 }
 
-/*
-*  Función encargada de imprimir los valores de los pines 
-*  una vez son modificados via fisico o HTTP
-*/
-void loop_pin_handler() {
-  digitalWrite(PINCARGA_ENCHUFE, estado_carga_actuador_enchufe);         // Aplica el cambio al actuador del enchufe
-  digitalWrite(PINRELE_INTERRUPTOR, estado_carga_actuador_interruptor);  // Aplica el cambio al actuador del interruptor
-}
-
-void configura_ServidorWEB() {
-  servidorWeb.on("/", manejadorRaiz);
-  servidorWeb.on("/enchufe/encender", manejadorEncenderEnchufe);
-  servidorWeb.on("/enchufe/apagar", manejadorApagarEnchufe);
-  servidorWeb.on("/enchufe/estado", manejadorEstadoEnchufe);
-  servidorWeb.on("/interruptor/encender", manejadorEncenderInterruptor);
-  servidorWeb.on("/interruptor/apagar", manejadorApagarInterruptor);
-  servidorWeb.on("/interruptor/estado", manejadorEstadoInterruptor);
-  servidorWeb.on("/persiana/subir", manejadorSubirPersiana);
-  servidorWeb.on("/persiana/bajar", manejadorBajarPersiana);
-  servidorWeb.on("/persiana/parar", manejadorPararPersiana);
-  servidorWeb.onNotFound(paginaNoEncontrada);
-}
-
-void conectar_WIFI() {
-  delay(10);  // Da tiempo a que se inicialice el hardware de la Wifi
-  WiFi.mode(WIFI_STA); // Establecer configuración wifi para no usar DHCP
-  WiFi.config(wifiIP, wifiON, wifiNET); //Para no usar DHCP hay que definir la red.
+void conectarWifi() {
+  delay(10);
+  WiFi.mode(WIFI_STA);
+  WiFi.config(wifiIP, wifiON, wifiNET);
   WiFi.begin(ssid, password);
-  Serial.printf("Conectándo a la wifi con SSID %s y clave %s", ssid, password);
+  Serial.printf("Conectando a la wifi con SSID %s y clave %s", ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -121,97 +92,54 @@ void conectar_WIFI() {
   Serial.println(WiFi.localIP());
 }
 
-/** FUNCIONES ASOCIADAS AL ENCHUFE **/
-void manejadorEstadoEnchufe() {
-  if (estado_carga_actuador_enchufe) {
-    servidorWeb.send(200, "text/plain", "encendido");
+void configurarServidorWeb() {
+  server.on("/", manejadorRaiz);
+  server.on("/enchufe/encender", manejadorEncenderEnchufe);
+  server.on("/enchufe/apagar", manejadorApagarEnchufe);
+  server.on("/enchufe/estado", manejadorEstadoEnchufe);
+  server.on("/interruptor/encender", manejadorEncenderInterruptor);
+  server.on("/interruptor/apagar", manejadorApagarInterruptor);
+  server.on("/interruptor/estado", manejadorEstadoInterruptor);
+  server.on("/persiana/subir", manejadorSubirPersiana);
+  server.on("/persiana/bajar", manejadorBajarPersiana);
+  server.on("/persiana/parar", manejadorPararPersiana);
+  server.onNotFound(paginaNoEncontrada);
+}
+
+void loopActuadorEnchufe() {
+  digitalWrite(PIN_ENCHUFE, estadoEnchufe);
+}
+
+void loopActuadorInterruptor() {
+  int estadoPulsador = digitalRead(PIN_PULSADOR_INTERRUPTOR); 
+
+  if (estadoPulsador == PULSADOR_ESTADO_ENCENDIDO && estadoPrevioPulsador == PULSADOR_ESTADO_APAGADO && !pulsadorEstabaPresionado) {
+    estadoInterruptor = !estadoInterruptor;
+    pulsadorEstabaPresionado = true;
+    Serial.println(estadoInterruptor == ESTADO_ENCENDIDO ? "Relé activado" : "Relé desactivado");
+  } 
+  if (estadoPulsador == PULSADOR_ESTADO_APAGADO && pulsadorEstabaPresionado) {
+    pulsadorEstabaPresionado = false;
+  }
+
+  estadoPrevioPulsador = estadoPulsador;
+  digitalWrite(PIN_INTERRUPTOR, estadoInterruptor);
+}
+
+void loopActuadorPersiana() {
+  if (estadoPersiana == 1) {
+    digitalWrite(PIN_PERSIANA_SUBIR, ESTADO_ENCENDIDO);
+    digitalWrite(PIN_PERSIANA_BAJAR, ESTADO_APAGADO);
+  } else if (estadoPersiana == 2) {
+    digitalWrite(PIN_PERSIANA_SUBIR, ESTADO_APAGADO);
+
+    digitalWrite(PIN_PERSIANA_BAJAR, ESTADO_ENCENDIDO);
   } else {
-    servidorWeb.send(200, "text/plain", "apagado");
+    digitalWrite(PIN_PERSIANA_SUBIR, ESTADO_APAGADO);
+    digitalWrite(PIN_PERSIANA_BAJAR, ESTADO_APAGADO);
   }
 }
 
-void manejadorApagarEnchufe() {
-  estado_carga_actuador_enchufe = APAGAR;
-  servidorWeb.send(200, "text/plain", "OK, actuador de enchufe apagado");
-}
-
-void manejadorEncenderEnchufe() {
-  estado_carga_actuador_enchufe = ENCENDER;
-  servidorWeb.send(200, "text/plain", "OK, actuador de enchufe encendido");
-}
-
-/** FUNCIONES ASOCIADAS AL INTERRUPTOR **/
-void manejadorEstadoInterruptor() {
-  if (estado_carga_actuador_interruptor) {
-    servidorWeb.send(200, "text/plain", "encendido");
-  } else {
-    servidorWeb.send(200, "text/plain", "apagado");
-  }
-}
-
-void manejadorApagarInterruptor() {
-  estado_carga_actuador_interruptor = APAGAR;
-
-  servidorWeb.send(200, "text/plain", "OK, actuador de interruptor apagado");
-  Serial.println("Relé desactivado");
-}
-
-void manejadorEncenderInterruptor() {
-  estado_carga_actuador_interruptor = ENCENDER;
-
-  servidorWeb.send(200, "text/plain", "OK, actuador de interruptor encendido");
-  Serial.println("Relé activado");
-}
-
-void loop_actuador_interruptor() {
-  int estado_pulsador = digitalRead(PINPULSADOR_INTERRUPTOR);  // Almacena en una variable el si el pulsador está pulsado o no
-
-  // Si el pulsador se presiona y no estaba presionado previamente, enciende el actuador
-  if (estado_pulsador == APAGAR && estado_anterior_pulsador == ENCENDER && !pulsador_estaba_presionado) {
-    estado_carga_actuador_interruptor = !estado_carga_actuador_interruptor;  // Cambia el estado del actuador
-    pulsador_estaba_presionado = true;                                       // Marca que el pulsador está presionado
-
-    Serial.println(estado_carga_actuador_interruptor == ENCENDER ? "LED encendido" : "LED apagado");
-  }
-
-  // Si el pulsador se suelta, marca que el pulsador ya no está presionado
-  if (estado_pulsador == ENCENDER && pulsador_estaba_presionado) {
-    pulsador_estaba_presionado = false;
-  }
-
-  estado_anterior_pulsador = estado_pulsador;  // Guarda el estado actual del pulsador para la próxima comparación
-}
-
-/** FUNCIONES ASOCIADAS A LA PERSIANA **/
-void manejadorSubirPersiana() {
-  estado_carga_actuador_persinana = 1;
-  servidorWeb.send(200, "text/plain", "OK, actuador de persiana subiendo");
-}
-
-void manejadorBajarPersiana() {
-  estado_carga_actuador_persinana = 2;
-  servidorWeb.send(200, "text/plain", "OK, actuador de persiana bajando");
-}
-
-void manejadorPararPersiana() {
-  estado_carga_actuador_persinana = 0;
-  servidorWeb.send(200, "text/plain", "OK, actuador de persiana parado");
-}
-
-void loop_actuador_persiana() {
-  if (estado_carga_actuador_persinana == 1) {
-    digitalWrite(PINCARGA_PERSIANA_SUBIR, ENCENDER);  // Aplica el cambio al actuador del interruptor
-    digitalWrite(PINCARGA_PERSIANA_BAJAR, APAGAR);    // Aplica el cambio al actuador del enchufe
-  } else if (estado_carga_actuador_persinana == 2) {
-    digitalWrite(PINCARGA_PERSIANA_SUBIR, APAGAR);    // Aplica el cambio al actuador del interruptor
-    digitalWrite(PINCARGA_PERSIANA_BAJAR, ENCENDER);  // Aplica el cambio al actuador del enchufe
-  } else {
-    digitalWrite(PINCARGA_PERSIANA_SUBIR, APAGAR);  // Aplica el cambio al actuador del interruptor
-    digitalWrite(PINCARGA_PERSIANA_BAJAR, APAGAR);  // Aplica el cambio al actuador del enchufe
-  }
-}
-
-// Página inicial con el menú de opciones
 void manejadorRaiz() {
   String mensaje;
   mensaje = "<!DOCTYPE HTML>\r\n<html>\r\n";
@@ -233,20 +161,73 @@ void manejadorRaiz() {
   mensaje += "Pulsa para <a href=/persiana/parar>Parar</a>";
   mensaje += "</body>";
   mensaje += "</html>\n";
-  servidorWeb.send(200, "text/html; charset=UTF-8", mensaje);
+  server.send(200, "text/html; charset=UTF-8", mensaje);
+}
+
+void manejadorEncenderEnchufe() {
+  estadoEnchufe = ESTADO_ENCENDIDO;
+  server.send(200, "text/plain", "OK, actuador de enchufe encendido");
+}
+
+void manejadorApagarEnchufe() {
+  estadoEnchufe = ESTADO_APAGADO;
+  server.send(200, "text/plain", "OK, actuador de enchufe apagado");
+}
+
+void manejadorEstadoEnchufe() {
+  if (estadoEnchufe) {
+    server.send(200, "text/plain", "encendido");
+  } else {
+    server.send(200, "text/plain", "apagado");
+  }
+}
+
+void manejadorEncenderInterruptor() {
+  estadoInterruptor = ESTADO_ENCENDIDO;
+  server.send(200, "text/plain", "OK, actuador de interruptor encendido");
+  Serial.println("Relé activado");
+}
+
+void manejadorApagarInterruptor() {
+  estadoInterruptor = ESTADO_APAGADO;
+  server.send(200, "text/plain", "OK, actuador de interruptor apagado");
+  Serial.println("Relé desactivado");
+}
+
+void manejadorEstadoInterruptor() {
+  if (estadoInterruptor) {
+    server.send(200, "text/plain", "encendido");
+  } else {
+    server.send(200, "text/plain", "apagado");
+  }
+}
+
+void manejadorSubirPersiana() {
+  estadoPersiana = 1;
+  server.send(200, "text/plain", "OK, actuador de persiana subiendo");
+}
+
+void manejadorBajarPersiana() {
+  estadoPersiana = 2;
+  server.send(200, "text/plain", "OK, actuador de persiana bajando");
+}
+
+void manejadorPararPersiana() {
+  estadoPersiana = 0;
+  server.send(200, "text/plain", "OK, actuador de persiana parado");
 }
 
 void paginaNoEncontrada() {
   String mensaje = "Página no encontrada\n\n";
   mensaje += "URI: ";
-  mensaje += servidorWeb.uri();
+  mensaje += server.uri();
   mensaje += "\nMetodo: ";
-  mensaje += (servidorWeb.method() == HTTP_GET) ? "GET" : "POST";
+  mensaje += (server.method() == HTTP_GET) ? "GET" : "POST";
   mensaje += "\nArgumentos: ";
-  mensaje += servidorWeb.args();
+  mensaje += server.args();
   mensaje += "\n";
-  for (uint8_t i = 0; i < servidorWeb.args(); i++) {
-    mensaje += " " + servidorWeb.argName(i) + ": " + servidorWeb.arg(i) + "\n";
+  for (uint8_t i = 0; i < server.args(); i++) {
+    mensaje += " " + server.argName(i) + ": " + server.arg(i) + "\n";
   }
-  servidorWeb.send(404, "text/plain", mensaje);
+  server.send(404, "text/plain", mensaje);
 }
