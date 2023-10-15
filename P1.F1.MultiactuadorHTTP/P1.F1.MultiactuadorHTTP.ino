@@ -58,13 +58,34 @@ void setup() {
   configurarServidorWeb();
   server.begin();
   Serial.println("Servidor web arrancado");
-  Serial.println("Listo. Conectarse a un navegador y usar estas URLs:");
-  Serial.print("Para activar: ");
+  Serial.println("Conectarse a un navegador y usar estos URLs:");
+  Serial.println("ACTUADOR DE ENCHUFE");
+  Serial.print("Para activar el relé: ");
   Serial.print(WiFi.localIP());
-  Serial.println("/activar");
-  Serial.print("Para desactivar: ");
+  Serial.println("/enchufe/encender");
+  Serial.print("Para desactivar el relé: ");
   Serial.print(WiFi.localIP());
-  Serial.println("/desactivar");
+  Serial.println("/enchufe/apagar");
+  Serial.println("ACTUADOR DE INTERRUPTOR");
+  Serial.print("Para activar el relé: ");
+  Serial.print(WiFi.localIP());
+  Serial.println("/interruptor/encender");
+  Serial.print("Para desactivar el relé: ");
+  Serial.print(WiFi.localIP());
+  Serial.println("/interruptor/apagar");
+  Serial.print("Para ver el estado del relé: ");
+  Serial.print(WiFi.localIP());
+  Serial.println("/interruptor/estado");
+  Serial.println("ACTUADOR DE PERSIANA");
+  Serial.print("Para subir: ");
+  Serial.print(WiFi.localIP());
+  Serial.println("/persiana/subir");
+  Serial.print("Para bajar: ");
+  Serial.print(WiFi.localIP());
+  Serial.println("/persiana/bajar");
+  Serial.print("Para parar: ");
+  Serial.print(WiFi.localIP());
+  Serial.println("/persiana/parar");
 }
 
 void loop() {
@@ -166,54 +187,63 @@ void manejadorRaiz() {
 
 void manejadorEncenderEnchufe() {
   estadoEnchufe = ESTADO_ENCENDIDO;
+  Serial.println("[HTTP] Actuador de enchufe: recibida orden de encender");
   server.send(200, "text/plain", "OK, actuador de enchufe encendido");
 }
 
 void manejadorApagarEnchufe() {
   estadoEnchufe = ESTADO_APAGADO;
+  Serial.println("[HTTP] Actuador de enchufe: recibida orden de apagar");
   server.send(200, "text/plain", "OK, actuador de enchufe apagado");
 }
 
 void manejadorEstadoEnchufe() {
   if (estadoEnchufe) {
+    Serial.println("[HTTP] Actuador de enchufe: recibida orden de petición de estado: encendido");
     server.send(200, "text/plain", "encendido");
   } else {
+    Serial.println("[HTTP] Actuador de enchufe: recibida orden de petición de estado: apagado");
     server.send(200, "text/plain", "apagado");
   }
 }
 
 void manejadorEncenderInterruptor() {
   estadoInterruptor = ESTADO_ENCENDIDO;
+  Serial.println("[HTTP] Actuador de interruptor: recibida orden de encender");
   server.send(200, "text/plain", "OK, actuador de interruptor encendido");
-  Serial.println("Relé activado");
 }
 
 void manejadorApagarInterruptor() {
   estadoInterruptor = ESTADO_APAGADO;
+  Serial.println("[HTTP] Actuador de enchufe: recibida orden de apagar");
   server.send(200, "text/plain", "OK, actuador de interruptor apagado");
-  Serial.println("Relé desactivado");
 }
 
 void manejadorEstadoInterruptor() {
   if (estadoInterruptor) {
+    Serial.println("[HTTP] Actuador de interruptor: recibida orden de petición de estado: encendido");
     server.send(200, "text/plain", "encendido");
   } else {
+    Serial.println("[HTTP] Actuador de interruptor: recibida orden de petición de estado: apagado");
     server.send(200, "text/plain", "apagado");
   }
 }
 
 void manejadorSubirPersiana() {
   estadoPersiana = 1;
+  Serial.println("[HTTP] Actuador de persiana: recibida orden de subir");
   server.send(200, "text/plain", "OK, actuador de persiana subiendo");
 }
 
 void manejadorBajarPersiana() {
   estadoPersiana = 2;
+  Serial.println("[HTTP] Actuador de persiana: recibida orden de bajar");
   server.send(200, "text/plain", "OK, actuador de persiana bajando");
 }
 
 void manejadorPararPersiana() {
   estadoPersiana = 0;
+  Serial.println("[HTTP] Actuador de persiana: recibida orden de parar");
   server.send(200, "text/plain", "OK, actuador de persiana parado");
 }
 
