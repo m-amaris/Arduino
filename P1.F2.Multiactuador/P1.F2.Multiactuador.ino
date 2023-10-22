@@ -58,6 +58,7 @@ PubSubClient clienteMQTT(clienteWIFI);
 char mensaje[MSG_BUFFER_SIZE];
 long tiempoUltimoMensaje = 0;
 
+//Inicializa los actuadores
 void setupActuadores() {
   pinMode(PIN_ENCHUFE, OUTPUT);
   pinMode(PIN_INTERRUPTOR, OUTPUT);
@@ -101,6 +102,11 @@ void conectarWifi() {
   Serial.println(WiFi.localIP());
 }
 
+/*
+* Funcion encargada de la conexion con mqtt, intenta conectarse un numero definido de veces
+* Si lo logra se suscribe a los topicos de interes, en este caso el enchufe e interruptor
+* De no conectarse espera un tiempo determinado para volver a intentarlo
+*/
 void conectar_MQTT() {
 
   for (int i = 0; i < NUMERO_REINTENTOS; i++) {
@@ -125,6 +131,10 @@ void conectar_MQTT() {
   }
 }
 
+/*
+* Funcion encargada de manejar los mensajes, cuando llega un mensaje a uno de los topicos suscritos esta funcion es llamada
+* Dado un mensaje se revisara su canal y se enviara a la funcion correspondiente
+*/
 void manejador_mensajes(char *canal, byte *mensaje, unsigned int longitud) {
   Serial.println("--------");
   Serial.print("Ha llegado un mensaje para el canal: ");
@@ -137,6 +147,10 @@ void manejador_mensajes(char *canal, byte *mensaje, unsigned int longitud) {
 }
 
 
+/**
+ * Si el mensaje recibido corresponde al canal del enchufe esta funcion sera llamada
+ * Segun el mensaje recibido se encendera o apagara el enchufe
+*/
 void tratamiento_mensaje_enchufe(byte *mensaje, unsigned int longitud) {
 
   char bufferTemporal[MSG_BUFFER_SIZE];
@@ -160,6 +174,10 @@ void tratamiento_mensaje_enchufe(byte *mensaje, unsigned int longitud) {
   Serial.println("--------");
 }
 
+/**
+ * Si el mensaje recibido corresponde al canal del interruptor esta funcion sera llamada
+ * Segun el mensaje recibido se encendera o apagara el interruptor
+*/
 void tratamiento_mensaje_interruptor(byte *mensaje, unsigned int longitud) {
 
   char bufferTemporal[MSG_BUFFER_SIZE];
@@ -182,10 +200,16 @@ void tratamiento_mensaje_interruptor(byte *mensaje, unsigned int longitud) {
   Serial.println("--------");
 }
 
+/**
+ * Funcion encargada de reflejar el estado del enchufe en el pin correspondiente
+*/
 void loopActuadorEnchufe() {
   digitalWrite(PIN_ENCHUFE, estadoEnchufe);
 }
 
+/**
+ * Funcion encargada de monitorear el estado del pulsador del interruptor y cambiar la variable de estado segun corresponda
+*/
 void loopActuadorInterruptor() {
   int estadoPulsador = digitalRead(PIN_PULSADOR_INTERRUPTOR);
 
@@ -203,6 +227,9 @@ void loopActuadorInterruptor() {
   publicarEstadoPulsador();
 }
 
+/**
+ * Funcion encargada de publicar en el topico correspondiente el estado del pulsador en intervalos designados
+*/
 void publicarEstadoPulsador() {
   long now = millis();
   if (now - tiempoUltimoMensaje > TIEMPO_ENTRE_MENSAJES) {
