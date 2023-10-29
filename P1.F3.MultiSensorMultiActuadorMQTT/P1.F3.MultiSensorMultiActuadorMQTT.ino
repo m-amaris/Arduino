@@ -21,8 +21,8 @@ const int ESTADO_APAGADO = LOW;
 const int ESTADO_ENCENDIDO = HIGH;
 
 // Parámetros de la red wifi
-const char *ssid = "ASUS";
-const char *password = "VIVAlosQUINTOSdel70!!!";
+const char *ssid = "iPhone de Miguel";
+const char *password = "envev1d0s";
 
 // Definición de las variables wifi y mqtt
 IPAddress wifiIP(10, 49, 33, 81);         // IP de la ESP8266
