@@ -1,34 +1,40 @@
 /* Grupo 8
-Alumnos: ESTEBAN y MIGUEL
+  Alumnos: ESTEBAN y MIGUEL
 
-Dispositivo compuesto por un multiactuador que se comunica por MQTT y un 
-multisensor que envía sus datos tanto por MQTT como por HTTP.
+  Dispositivo compuesto por un multiactuador que se comunica por MQTT y un 
+  multisensor que envía sus datos tanto por MQTT como por HTTP.
 
-El multiactuador está compuesto por un actuador de enchufe y un actuador de 
-interruptor. El multisensor está compuesto por un sensor de temperatura, uno 
-de humedad y otro de sensación térmica.
+  El multiactuador está compuesto por un actuador de enchufe y un actuador de 
+  interruptor. El multisensor está compuesto por un sensor de temperatura, uno 
+  de humedad y otro de sensación térmica.
 */
 
-#include <WiFi.h>
+#include <WiFi.h>          // Biblioteca para el módulo WiFi (ESP32)
 #include <PubSubClient.h>  // Biblioteca para el cliente MQTT
-#include <DHT.h>
+#include <DHT.h>           // Biblioteca para el sensor DHT11
 
+/* Definición de constantes y variables COMUNES al multiactuador y multisensor*/
+#define ENCENDER HIGH
+#define APAGAR LOW
+const int ESTADO_APAGADO = LOW;
+const int ESTADO_ENCENDIDO = HIGH;
 
-//Constantes DHT11
-#define DHTPIN 2
-#define DHTTYPE DHT11
+// Parámetros de la red wifi
+const char *ssid = "ASUS";
+const char *password = "VIVAlosQUINTOSdel70!!!";
 
-// Constantes MQTT
+// Definición de las variables wifi y mqtt
+IPAddress wifiIP(10, 49, 33, 81);         // IP de la ESP8266
+IPAddress wifiNET(255, 254, 0, 0);        // Máscara de red
+IPAddress wifiON(10, 48, 0, 1);           // Dirección IP del encaminador
+IPAddress mqtt_server(192, 168, 1, 210);  //IP del broker
+WiFiClient clienteWIFI;
+
 #define MSG_BUFFER_SIZE (50)
 #define TIEMPO_ENTRE_MENSAJES (5000)
 #define NUMERO_REINTENTOS (3)
 #define TIEMPO_RECONEXION (5000)
-#define OPCION_ABRIR "encender"
-#define OPCION_BLOQUEAR "apagar"
-#define ENCENDER HIGH
-#define APAGAR LOW
 
-//Topicos
 #define TOPIC_SUBSCRIPCION_ENCHUFE "casa/dormitorio/enchufe/orden"
 #define TOPIC_SUBSCRIPCION_INTERRUPTOR "casa/dormitorio/luztecho/orden"
 #define TOPIC_PUBLICACION_INTERRUPTOR "casa/dormitorio/luztecho/estado"
@@ -39,79 +45,65 @@ de humedad y otro de sensación térmica.
 #define TOPIC_PUBLICACION_DORMITORIO_SENSACION "casa/dormitorio/sensacionTermica"
 #define TOPIC_PUBLICACION_SALON_SENSACION "casa/salon/sensacionTermica"
 
-
-// Definición de constantes
-const int ESTADO_APAGADO = LOW;
-const int ESTADO_ENCENDIDO = HIGH;
-const int PULSADOR_ESTADO_APAGADO = HIGH;   // PullUp
-const int PULSADOR_ESTADO_ENCENDIDO = LOW;  // PullUp
-
-// Pines de actuadores
-const int PIN_ENCHUFE = 12;
-const int PIN_INTERRUPTOR = 17;
-const int PIN_PULSADOR_INTERRUPTOR = 22;
-
-// Variables de estado
-bool estadoEnchufe = ESTADO_APAGADO;
-bool estadoInterruptor = ESTADO_APAGADO;
-bool estadoPrevioPulsador = ESTADO_APAGADO;
-
-// Otras variables
-bool pulsadorEstabaPresionado = false;
-
-// Parametros de conexión Wifi
-const char *ssid = "ASUS";
-const char *password = "VIVAlosQUINTOSdel70!!!";
-
-
-IPAddress wifiIP(10, 49, 33, 81); // IP de la ESP8266
-IPAddress wifiNET(255, 254, 0, 0); // Máscara de red
-IPAddress wifiON(10, 48, 0, 1); // Dirección IP del encaminador
-IPAddress mqtt_server(192, 168, 1, 210); //IP del broker
 const String clientId = "esp32Cliente-1";  // Identificador único de cliente. Cada dispositivo del hogar tiene que tener un identificador diferente
-
-// Variables globales
-WiFiClient clienteWIFI;
 PubSubClient clienteMQTT(clienteWIFI);
 char mensaje[MSG_BUFFER_SIZE];
-long tiempoUltimoMensaje = 0;
 
-//DHT11
+/* Definición de constantes COMUNES del MULTIACTUADOR*/
+#define OPCION_ENCENDER "encender"
+#define OPCION_BLOQUEAR "apagar"
+const int PULSADOR_ESTADO_APAGADO = HIGH;   // PullUp
+const int PULSADOR_ESTADO_ENCENDIDO = LOW;  // PullUp
+long tiempoUltimoMensajeMultiActuador = 0;
+
+/* Definición de constantes y variables del ACTUADOR DE ENCHUFE */
+#define PIN_ENCHUFE 12
+bool estadoEnchufe = ESTADO_APAGADO;
+
+/* Definición de constantes y variables del ACTUADOR DE INTERRUPTOR*/
+#define PIN_INTERRUPTOR 17
+#define PIN_PULSADOR_INTERRUPTOR 22
+bool estadoInterruptor = ESTADO_APAGADO;
+bool estadoPrevioPulsador = ESTADO_APAGADO;
+bool pulsadorEstabaPresionado = false;
+
+/* Definición de constantes y variables del MULTISENSOR */
+#define DHTPIN 2
+#define DHTTYPE DHT11
 DHT dht(DHTPIN, DHTTYPE);
+long tiempoUltimoMensajeMultiSensor = 0;
 
-//Inicializa los actuadores
-void setupActuadores() {
+void setup() {
+  Serial.begin(115200);
+  Serial.println();
+  Serial.println();
+  setup_actuador_enchufe();
+  setup_actuador_interruptor();
+  setup_multisensor();
+
+  conectarWifi();
+  configurar_MQTT();
+
+  Serial.println("Inicialización del dispositivo terminada.");
+}
+
+void setup_actuador_enchufe() {
   pinMode(PIN_ENCHUFE, OUTPUT);
+}
+
+void setup_actuador_interruptor() {
   pinMode(PIN_INTERRUPTOR, OUTPUT);
   pinMode(PIN_PULSADOR_INTERRUPTOR, INPUT_PULLUP);
 }
 
-void setup() {
-  setupActuadores();
-  Serial.begin(115200);
-  conectarWifi();
-  clienteMQTT.setServer(mqtt_server, 1883);
-  clienteMQTT.setCallback(manejador_mensajes);
+void setup_multisensor() {
   dht.begin();
-}
-
-void loop() {
-  // Se asegura de que existe conexión con el broker
-  if (!clienteMQTT.connected()) {
-    conectar_MQTT();
-  }
-
-  // Se comprueban mensajes entrantes
-  clienteMQTT.loop();
-  loopActuadorEnchufe();
-  loopActuadorInterruptor();
-  loopMultisensor();
 }
 
 void conectarWifi() {
   delay(10);
-  WiFi.mode(WIFI_STA);                  // Comentar si se usa DHCP
-  WiFi.config(wifiIP, wifiON, wifiNET); // Comentar si se usa DHCP
+  //WiFi.mode(WIFI_STA);                  // Comentar si se usa DHCP
+  //WiFi.config(wifiIP, wifiON, wifiNET); // Comentar si se usa DHCP
   WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {
@@ -123,6 +115,30 @@ void conectarWifi() {
   Serial.println("Conectado a WiFi!");
   Serial.print("Dirección IP: ");
   Serial.println(WiFi.localIP());
+}
+
+void configurar_MQTT() {
+  clienteMQTT.setServer(mqtt_server, 1883);
+  clienteMQTT.setCallback(manejador_mensajes);
+}
+
+void loop() {
+  clienteMQTT.loop();  // Se comprueban mensajes entrantes
+  loopActuadorEnchufe();
+  loopActuadorInterruptor();
+  loop_multiActuadorMQTT();
+  loopMultisensor();
+}
+
+/*
+* Verifica si hay conexión con el broker. Si la hay, invoca a la función 
+* conectar_MQTT() de los ejemplos y comprueba si llegan mensajes.
+*/
+void loop_multiActuadorMQTT() {
+  // Se asegura de que existe conexión con el broker
+  if (!clienteMQTT.connected()) {
+    conectar_MQTT();
+  }
 }
 
 /*
@@ -170,9 +186,9 @@ void manejador_mensajes(char *canal, byte *mensaje, unsigned int longitud) {
 }
 
 
-/**
- * Si el mensaje recibido corresponde al canal del enchufe esta funcion sera llamada
- * Segun el mensaje recibido se encendera o apagara el enchufe
+/*
+* Si el mensaje recibido corresponde al canal del enchufe esta funcion sera llamada
+* Segun el mensaje recibido se encendera o apagara el enchufe
 */
 void tratamiento_mensaje_enchufe(byte *mensaje, unsigned int longitud) {
 
@@ -183,23 +199,23 @@ void tratamiento_mensaje_enchufe(byte *mensaje, unsigned int longitud) {
   Serial.print("Mensaje recibido: ");
   Serial.println(bufferTemporal);
 
-  if (strcmp(bufferTemporal, OPCION_ABRIR) == 0) {
-    Serial.println("Se procede a encender la luz.");
+  if (strcmp(bufferTemporal, OPCION_ENCENDER) == 0) {
+    Serial.println("Se procede a encender el enchufe.");
     estadoEnchufe = ESTADO_ENCENDIDO;
     //digitalWrite(PIN_ENCHUFE, estadoEnchufe);
   } else if (strcmp(bufferTemporal, OPCION_BLOQUEAR) == 0) {
-    Serial.println("Se procede a apagar la luz.");
+    Serial.println("Se procede a apagar el enchufe.");
     estadoEnchufe = ESTADO_APAGADO;
-    
+
   } else {
     Serial.println("*** ERROR ***. Formato del mensaje recibido erróneo.");
   }
   Serial.println("--------");
 }
 
-/**
- * Si el mensaje recibido corresponde al canal del interruptor esta funcion sera llamada
- * Segun el mensaje recibido se encendera o apagara el interruptor
+/*
+* Si el mensaje recibido corresponde al canal del interruptor esta funcion sera llamada
+* Segun el mensaje recibido se encendera o apagara el interruptor
 */
 void tratamiento_mensaje_interruptor(byte *mensaje, unsigned int longitud) {
 
@@ -210,11 +226,11 @@ void tratamiento_mensaje_interruptor(byte *mensaje, unsigned int longitud) {
   Serial.print("Mensaje recibido: ");
   Serial.println(bufferTemporal);
 
-  if (strcmp(bufferTemporal, OPCION_ABRIR) == 0) {
-    Serial.println("Se procede a encender la luz.");
+  if (strcmp(bufferTemporal, OPCION_ENCENDER) == 0) {
+    Serial.println("Se procede a encender el interruptor.");
     estadoInterruptor = ESTADO_ENCENDIDO;
   } else if (strcmp(bufferTemporal, OPCION_BLOQUEAR) == 0) {
-    Serial.println("Se procede a apagar la luz.");
+    Serial.println("Se procede a apagar el interruptor.");
     estadoInterruptor = ESTADO_APAGADO;
   } else {
     Serial.println("*** ERROR ***. Formato del mensaje recibido erróneo.");
@@ -223,15 +239,15 @@ void tratamiento_mensaje_interruptor(byte *mensaje, unsigned int longitud) {
   Serial.println("--------");
 }
 
-/**
- * Funcion encargada de reflejar el estado del enchufe en el pin correspondiente
+/*
+* Funcion encargada de reflejar el estado del enchufe en el pin correspondiente
 */
 void loopActuadorEnchufe() {
   digitalWrite(PIN_ENCHUFE, estadoEnchufe);
 }
 
-/**
- * Funcion encargada de monitorear el estado del pulsador del interruptor y cambiar la variable de estado segun corresponda
+/*
+* Funcion encargada de monitorear el estado del pulsador del interruptor y cambiar la variable de estado segun corresponda
 */
 void loopActuadorInterruptor() {
   int estadoPulsador = digitalRead(PIN_PULSADOR_INTERRUPTOR);
@@ -250,61 +266,60 @@ void loopActuadorInterruptor() {
   publicarEstadoPulsador();
 }
 
-/**
- * Funcion encargada de publicar en el topico correspondiente el estado del pulsador en intervalos designados
+/*
+* Funcion encargada de publicar en el topic correspondiente el estado del pulsador en intervalos designados
 */
 void publicarEstadoPulsador() {
   long now = millis();
-  if (now - tiempoUltimoMensaje > TIEMPO_ENTRE_MENSAJES) {
-    // Se actualiza el último mensaje a la referencia de tiempo actual
-    tiempoUltimoMensaje = now;
-
+  if (now - tiempoUltimoMensajeMultiActuador > TIEMPO_ENTRE_MENSAJES) {
+    tiempoUltimoMensajeMultiActuador = now;  // Se actualiza el último mensaje a la referencia de tiempo actual
     if (estadoInterruptor == ESTADO_ENCENDIDO) {
-    snprintf (mensaje, MSG_BUFFER_SIZE, "ON"); 
-   } else {
-    snprintf (mensaje, MSG_BUFFER_SIZE, "OFF");
-   }
-   Serial.print("Mensaje a publicar: "); 
-   Serial.println(mensaje);
+      snprintf(mensaje, MSG_BUFFER_SIZE, "ON");
+    } else {
+      snprintf(mensaje, MSG_BUFFER_SIZE, "OFF");
+    }
+    Serial.print("Mensaje a publicar: ");
+    Serial.println(mensaje);
 
-  mqtt_EnviarMensaje(TOPIC_PUBLICACION_INTERRUPTOR);
+    mqtt_EnviarMensaje(TOPIC_PUBLICACION_INTERRUPTOR);
   }
 }
 
-void mqtt_EnviarMensaje(char* topic){
-    clienteMQTT.publish(topic, mensaje); 
+void mqtt_EnviarMensaje(char *topic) {
+  clienteMQTT.publish(topic, mensaje);
 }
 
-void loopMultisensor(){
+/* Cada cierto tiempo toma medidas de los sensores y, si no hay errores, envía 
+*  las medidas por mqtt y por http
+*/
+void loopMultisensor() {
   long now = millis();
-  if (now - tiempoUltimoMensaje > TIEMPO_ENTRE_MENSAJES) {
-    // Se actualiza el último mensaje a la referencia de tiempo actual
-    tiempoUltimoMensaje = now;
+  if (now - tiempoUltimoMensajeMultiSensor > TIEMPO_ENTRE_MENSAJES) {
+    tiempoUltimoMensajeMultiSensor = now;  // Se actualiza el último mensaje a la referencia de tiempo actual
+    //float h = dht.readHumidity();
+    //float t = dht.readTemperature();  // Read temperature as Celsius (the default)
+    float h = random(0, 100) / 100.0;  // a random decimal number from 0.00 to 0.99
+    float t = random(-10, 51);         // a random integer from -10 to 50
+    // Check if any reads failed and exit early (to try again).
+    if (isnan(h) || isnan(t)) {
+      Serial.println(F("Failed to read from DHT sensor!"));
+      return;
+    }
 
-    float h = dht.readHumidity();
-  // Read temperature as Celsius (the default)
-  float t = dht.readTemperature();
+    float hic = dht.computeHeatIndex(t, h, false);  // Compute heat index in Celsius
 
-  // Check if any reads failed and exit early (to try again).
-  if (isnan(h) || isnan(t)) {
-    Serial.println(F("Failed to read from DHT sensor!"));
-    return;
-  }
-
-  // Compute heat index in Celsius
-  float hic = dht.computeHeatIndex(t, h, false);
-
-  Serial.print("temperatura a publicar: "); 
-  sprintf(mensaje,"%f",t);
-  Serial.println(mensaje);
-  mqtt_EnviarMensaje(TOPIC_PUBLICACION_DORMITORIO_TEMPERATURA);
-  Serial.print("humedad a publicar: "); 
-  sprintf(mensaje,"%f",h);
-  Serial.println(mensaje);
-  mqtt_EnviarMensaje(TOPIC_PUBLICACION_DORMITORIO_HUMEDAD);
-  Serial.print("sensacion termica a publicar: "); 
-  sprintf(mensaje,"%f",hic);
-  Serial.println(mensaje);
-  mqtt_EnviarMensaje(TOPIC_PUBLICACION_DORMITORIO_SENSACION);
+    Serial.print("Temperatura a publicar: ");
+    sprintf(mensaje, "%f", t);
+    Serial.println(mensaje);
+    mqtt_EnviarMensaje(TOPIC_PUBLICACION_DORMITORIO_TEMPERATURA);
+    Serial.print("Humedad a publicar: ");
+    sprintf(mensaje, "%f", h);
+    Serial.println(mensaje);
+    mqtt_EnviarMensaje(TOPIC_PUBLICACION_DORMITORIO_HUMEDAD);
+    Serial.print("Sensacion termica a publicar: ");
+    sprintf(mensaje, "%f", hic);
+    Serial.println(mensaje);
+    mqtt_EnviarMensaje(TOPIC_PUBLICACION_DORMITORIO_SENSACION);
+    Serial.println("---------------------------");
   }
 }
