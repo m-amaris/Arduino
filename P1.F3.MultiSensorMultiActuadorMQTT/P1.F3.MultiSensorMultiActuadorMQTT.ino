@@ -12,6 +12,7 @@
 #include <WiFi.h>          // Biblioteca para el módulo WiFi (ESP32)
 #include <PubSubClient.h>  // Biblioteca para el cliente MQTT
 #include <DHT.h>           // Biblioteca para el sensor DHT11
+#include <HTTPClient.h>
 
 /* Definición de constantes y variables COMUNES al multiactuador y multisensor*/
 #define ENCENDER HIGH
@@ -39,11 +40,8 @@ WiFiClient clienteWIFI;
 #define TOPIC_SUBSCRIPCION_INTERRUPTOR "casa/dormitorio/luztecho/orden"
 #define TOPIC_PUBLICACION_INTERRUPTOR "casa/dormitorio/luztecho/estado"
 #define TOPIC_PUBLICACION_DORMITORIO_TEMPERATURA "casa/dormitorio/temperatura"
-#define TOPIC_PUBLICACION_SALON_TEMPERATURA "casa/salon/temperatura"
 #define TOPIC_PUBLICACION_DORMITORIO_HUMEDAD "casa/dormitorio/humedad"
-#define TOPIC_PUBLICACION_SALON_HUMEDAD "casa/salon/humedad"
 #define TOPIC_PUBLICACION_DORMITORIO_SENSACION "casa/dormitorio/sensacionTermica"
-#define TOPIC_PUBLICACION_SALON_SENSACION "casa/salon/sensacionTermica"
 
 const String clientId = "esp32Cliente-1";  // Identificador único de cliente. Cada dispositivo del hogar tiene que tener un identificador diferente
 PubSubClient clienteMQTT(clienteWIFI);
@@ -68,10 +66,16 @@ bool estadoPrevioPulsador = ESTADO_APAGADO;
 bool pulsadorEstabaPresionado = false;
 
 /* Definición de constantes y variables del MULTISENSOR */
+#define RUTA_sensor_temperatura_salon "/rest/items/Salon_Temperatura"
+#define RUTA_sensor_humedad_salon "/rest/items/Salon_Humedad" 
+#define RUTA_sensor_sensacion_salon "/rest/items/Salon_SensacionTermica"
 #define DHTPIN 2
 #define DHTTYPE DHT11
 DHT dht(DHTPIN, DHTTYPE);
 long tiempoUltimoMensajeMultiSensor = 0;
+const String IPServidorWeb = "192.168.1.210";
+const String puerto = "8080";
+HTTPClient clienteHTTP;               // Variable que se usará como cliente HTTP
 
 void setup() {
   Serial.begin(115200);
@@ -116,6 +120,14 @@ void conectarWifi() {
   Serial.println("Conectado a WiFi!");
   Serial.print("Dirección IP: ");
   Serial.println(WiFi.localIP());
+}
+
+/* Función estoyConectado()
+   Verifica si el microcontrolador sigue conectado a la wifi
+   Devuelve un valor boolean: true si está conectado y false si no lo está
+*/
+bool estoyConectado() {
+  return (WiFi.status() == WL_CONNECTED);
 }
 
 void configurar_MQTT() {
@@ -240,6 +252,40 @@ void tratamiento_mensaje_interruptor(byte *mensaje, unsigned int longitud) {
   Serial.println("--------");
 }
 
+
+/* Función envioDatoHTTPPostt()
+   Se emplea para enviar por POST al Servidor Web el dato que se recibe como parámetro
+*/
+void envioDatoHTTPPost(String dato, String ruta) {
+  WiFiClient clienteWiFi;
+  if (!estoyConectado())
+    // Si se ha perdido la conexión con la red WiFi se vuelve a establecer
+    conectarWifi();
+
+  //Serial.print("[HTTP] comienzo...\n");
+  if (clienteHTTP.begin(clienteWiFi, "http://" + IPServidorWeb + ":"+puerto+ruta)) {
+    // Conexión HTTP iniciada
+    Serial.print("...");
+    clienteHTTP.addHeader("Content-Type", "text/plain");  // Añadir cabecera a la petición POST
+    int httpCode = clienteHTTP.POST(dato);
+    // httpCode debe ser un valor positivo, en caso contrario es un error
+    if (httpCode > 0) {
+      // Mostrar el código devuelto
+      //Serial.printf("[HTTP] POST... código: %d\n", httpCode);
+
+      // Si el servidor devuelve un código de que la petición es correcta
+      if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) {
+        String payload = clienteHTTP.getString();
+        Serial.println(payload);  // Se muestra por consola la respuesta del servidor
+      }
+    } else {
+      Serial.printf("[HTTP] POST... fallo, código de error: %s\n", clienteHTTP.errorToString(httpCode).c_str());
+    }
+    clienteHTTP.end();
+  } else {
+    Serial.printf("[HTTP} Falló la conexión HTTP\n");
+  }
+}
 /*
 * Funcion encargada de reflejar el estado del enchufe en el pin correspondiente
 */
@@ -300,6 +346,7 @@ void loopMultisensor() {
   if (now - tiempoUltimoMensajeMultiSensor > TIEMPO_ENTRE_MENSAJES) {
     tiempoUltimoMensajeMultiSensor = now;  // Se actualiza el último mensaje a la referencia de tiempo actual
 
+    Serial.println();
     Serial.print("Tomando medidas del sensor ");
     //float h = dht.readHumidity();
     //float t = dht.readTemperature();  // Read temperature as Celsius (the default)
@@ -349,7 +396,30 @@ void loopMultisensor() {
     Serial.print(" al topic ");
     Serial.println(TOPIC_PUBLICACION_DORMITORIO_SENSACION);
     mqtt_EnviarMensaje(TOPIC_PUBLICACION_DORMITORIO_SENSACION);
+ 
+    float h2 = h+1;
+    float t2 = t+1;
+    float hic2 = hic+1;
 
-    
+    Serial.print("[HTTP] Enviar el dato ");
+    sprintf(mensaje, "%.2f", t2);
+    Serial.print(mensaje);
+    Serial.print(" al url ");
+    Serial.print("http://" + IPServidorWeb + ":"+puerto+RUTA_sensor_temperatura_salon);
+    envioDatoHTTPPost(mensaje,RUTA_sensor_temperatura_salon);
+
+    Serial.print("[HTTP] Enviar el dato ");
+    sprintf(mensaje, "%.2f", h2);
+    Serial.print(mensaje);
+    Serial.print(" al url ");
+    Serial.print("http://" + IPServidorWeb + ":"+puerto+RUTA_sensor_humedad_salon);
+    envioDatoHTTPPost(mensaje,RUTA_sensor_humedad_salon);
+
+    Serial.print("[HTTP] Enviar el dato ");
+    sprintf(mensaje, "%.2f", hic2);
+    Serial.print(mensaje);
+    Serial.print(" al url ");
+    Serial.print("http://" + IPServidorWeb + ":"+puerto+RUTA_sensor_sensacion_salon);
+    envioDatoHTTPPost(mensaje,RUTA_sensor_sensacion_salon);
   }
 }
