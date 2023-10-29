@@ -1,10 +1,18 @@
 /* Grupo 8
 Alumnos: ESTEBAN y MIGUEL
+
+Dispositivo compuesto por un multiactuador que se comunica por MQTT y un 
+multisensor que envía sus datos tanto por MQTT como por HTTP.
+
+El multiactuador está compuesto por un actuador de enchufe y un actuador de 
+interruptor. El multisensor está compuesto por un sensor de temperatura, uno 
+de humedad y otro de sensación térmica.
 */
 
 #include <WiFi.h>
 #include <PubSubClient.h>  // Biblioteca para el cliente MQTT
-#include "DHT.h"
+#include <DHT.h>
+
 
 //Constantes DHT11
 #define DHTPIN 2
@@ -52,18 +60,14 @@ bool estadoPrevioPulsador = ESTADO_APAGADO;
 bool pulsadorEstabaPresionado = false;
 
 // Parametros de conexión Wifi
-const char *ssid = "LABDTE";
-const char *password = "envev1d0s";
+const char *ssid = "ASUS";
+const char *password = "VIVAlosQUINTOSdel70!!!";
 
-// IP de la ESP8266
-IPAddress wifiIP(10, 49, 33, 81);
-// Máscara de red
-IPAddress wifiNET(255, 254, 0, 0);
-// Dirección IP del encaminador
-IPAddress wifiON(10, 48, 0, 1);
-//IP del broker
-IPAddress mqtt_server(10, 49, 33, 80);
 
+IPAddress wifiIP(10, 49, 33, 81); // IP de la ESP8266
+IPAddress wifiNET(255, 254, 0, 0); // Máscara de red
+IPAddress wifiON(10, 48, 0, 1); // Dirección IP del encaminador
+IPAddress mqtt_server(192, 168, 1, 210); //IP del broker
 const String clientId = "esp32Cliente-1";  // Identificador único de cliente. Cada dispositivo del hogar tiene que tener un identificador diferente
 
 // Variables globales
@@ -106,8 +110,8 @@ void loop() {
 
 void conectarWifi() {
   delay(10);
-  WiFi.mode(WIFI_STA);
-  WiFi.config(wifiIP, wifiON, wifiNET);
+  WiFi.mode(WIFI_STA);                  // Comentar si se usa DHCP
+  WiFi.config(wifiIP, wifiON, wifiNET); // Comentar si se usa DHCP
   WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {
