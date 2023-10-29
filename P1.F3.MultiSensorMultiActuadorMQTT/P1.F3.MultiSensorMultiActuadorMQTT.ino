@@ -279,9 +279,11 @@ void publicarEstadoPulsador() {
     } else {
       snprintf(mensaje, MSG_BUFFER_SIZE, "OFF");
     }
-    Serial.print("Mensaje a publicar: ");
-    Serial.println(mensaje);
-
+  
+    Serial.print("[MQTT] Enviar el dato ");
+    Serial.print(mensaje);
+    Serial.print(" al topic ");
+    Serial.println(TOPIC_PUBLICACION_INTERRUPTOR);
     mqtt_EnviarMensaje(TOPIC_PUBLICACION_INTERRUPTOR);
   }
 }
@@ -348,6 +350,6 @@ void loopMultisensor() {
     Serial.println(TOPIC_PUBLICACION_DORMITORIO_SENSACION);
     mqtt_EnviarMensaje(TOPIC_PUBLICACION_DORMITORIO_SENSACION);
 
-    Serial.println("---------------------------");
+    
   }
 }
