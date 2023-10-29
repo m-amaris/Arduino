@@ -98,6 +98,7 @@ void setup_actuador_interruptor() {
 
 void setup_multisensor() {
   dht.begin();
+  Serial.println("Sensor DHT inicializado");
 }
 
 void conectarWifi() {
@@ -152,7 +153,7 @@ void conectar_MQTT() {
 
     // Intento de conexión
     if (clienteMQTT.connect(clientId.c_str())) {
-      Serial.println("Conectado");
+      Serial.println("Conectado al broker");
 
       clienteMQTT.subscribe(TOPIC_SUBSCRIPCION_ENCHUFE);
       clienteMQTT.subscribe(TOPIC_SUBSCRIPCION_INTERRUPTOR);
@@ -296,30 +297,57 @@ void loopMultisensor() {
   long now = millis();
   if (now - tiempoUltimoMensajeMultiSensor > TIEMPO_ENTRE_MENSAJES) {
     tiempoUltimoMensajeMultiSensor = now;  // Se actualiza el último mensaje a la referencia de tiempo actual
+
+    Serial.print("Tomando medidas del sensor ");
     //float h = dht.readHumidity();
     //float t = dht.readTemperature();  // Read temperature as Celsius (the default)
-    float h = random(0, 100) / 100.0;  // a random decimal number from 0.00 to 0.99
-    float t = random(-10, 51);         // a random integer from -10 to 50
+    float h = random(0, 1000) / 10;       // a random decimal number from 0.00 to 0.99
+    float t = random(-1000, 5100) / 100;   // a random integer from -10 to 50
+
     // Check if any reads failed and exit early (to try again).
     if (isnan(h) || isnan(t)) {
-      Serial.println(F("Failed to read from DHT sensor!"));
+      Serial.println();
+      Serial.println(F("Error al leer del sensor de temperatura"));
+      Serial.println(F("Error al leer del sensor de humedad"));
+      Serial.println(F("Error al leer del sensor!"));
       return;
     }
-
     float hic = dht.computeHeatIndex(t, h, false);  // Compute heat index in Celsius
 
-    Serial.print("Temperatura a publicar: ");
-    sprintf(mensaje, "%f", t);
-    Serial.println(mensaje);
+    Serial.print("Temperatura: ");
+    Serial.print(t,2);
+    Serial.print("°C ");
+
+    Serial.print("Humedad: ");
+    Serial.print(h,2);
+    Serial.print("°C ");
+
+    Serial.print("Sensación Térmica: ");
+    Serial.print(hic,2);
+    Serial.print("°C");
+
+    Serial.println();
+    Serial.print("[MQTT] Enviar el dato ");
+    sprintf(mensaje, "%.2f", t);
+    Serial.print(mensaje);
+    Serial.print(" al topic ");
+    Serial.println(TOPIC_PUBLICACION_DORMITORIO_TEMPERATURA);
     mqtt_EnviarMensaje(TOPIC_PUBLICACION_DORMITORIO_TEMPERATURA);
-    Serial.print("Humedad a publicar: ");
-    sprintf(mensaje, "%f", h);
-    Serial.println(mensaje);
+
+    Serial.print("[MQTT] Enviar el dato ");
+    sprintf(mensaje, "%.2f", h);
+    Serial.print(mensaje);
+    Serial.print(" al topic ");
+    Serial.println(TOPIC_PUBLICACION_DORMITORIO_HUMEDAD);
     mqtt_EnviarMensaje(TOPIC_PUBLICACION_DORMITORIO_HUMEDAD);
-    Serial.print("Sensacion termica a publicar: ");
-    sprintf(mensaje, "%f", hic);
-    Serial.println(mensaje);
+
+    Serial.print("[MQTT] Enviar el dato ");
+    sprintf(mensaje, "%.2f", hic);
+    Serial.print(mensaje);
+    Serial.print(" al topic ");
+    Serial.println(TOPIC_PUBLICACION_DORMITORIO_SENSACION);
     mqtt_EnviarMensaje(TOPIC_PUBLICACION_DORMITORIO_SENSACION);
+
     Serial.println("---------------------------");
   }
 }
