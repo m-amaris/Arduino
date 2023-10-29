@@ -9,18 +9,18 @@
    Además se ha realizado empleando funciones y constantes
 */
 
-#include <ESP8266WiFi.h>
-#include <ESP8266HTTPClient.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
 #include <WiFiClient.h>
 
 // Definición de constantes
 // Se configura como constantes los datos de identificación de la red WiFi
-const char* ssid     = "xxxxxxxxxxxxxx"; // Establecer SSID red WiFi de tu casa
-const char* password = "xxxxxxxxxxxxxx"; // Establecer contraseña red WiFi de tu casa
+const char *ssid = "ASUS";
+const char *password = "VIVAlosQUINTOSdel70!!!";
 
 
 // Se define en una constante la IP asignada a la máquina virtual donde corre el Servidor Web
-const String IPServidorWeb = "192.168.0.91";
+const String IPServidorWeb = "192.168.1.210";
 
 // Se definen dos constantes para entender mejor lo que significa Encender o Apagar
 #define APAGAR HIGH
@@ -87,11 +87,11 @@ void conectar_WIFI() {
   delay(10);
 
   // Establecer configuración wifi para no usar DHCP
-  WiFi.mode(WIFI_STA);
+  //WiFi.mode(WIFI_STA);
 
 
   // Se establecen los parámetros de red sin usar DHCP
-  WiFi.config(wifiIP, wifiON, wifiNET);
+  //WiFi.config(wifiIP, wifiON, wifiNET);
   WiFi.begin(ssid, password);
   // Intentar la conexión cada medio segundo hasta conseguirlo, mostrando un punto en cada intento
   while (WiFi.status() != WL_CONNECTED) {
