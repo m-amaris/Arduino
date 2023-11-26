@@ -9,10 +9,10 @@
   de humedad y otro de sensación térmica.
 */
 
-#include <WiFi.h>          // Biblioteca para el módulo WiFi (ESP32)
-#include <PubSubClient.h>  // Biblioteca para el cliente MQTT
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
 #include <DHT.h>           // Biblioteca para el sensor DHT11
-#include <HTTPClient.h>
+#include <ESP8266HTTPClient.h>
 
 /* Definición de constantes y variables COMUNES al multiactuador y multisensor*/
 #define ENCENDER HIGH
@@ -342,10 +342,10 @@ void loop_multiSensor() {
 
     Serial.println();
     Serial.print("Tomando medidas del sensor ");
-    float h = dht.readHumidity();
-    float t = dht.readTemperature();  // Read temperature as Celsius (the default)
-    //float h = random(0, 1000) / 10;       // a random decimal number from 0.00 to 0.99
-    //float t = random(-1000, 5100) / 100;   // a random integer from -10 to 50
+    //float h = dht.readHumidity();
+    //float t = dht.readTemperature();  // Read temperature as Celsius (the default)
+    float h = random(0, 1000) / 10;       // a random decimal number from 0.00 to 0.99
+    float t = random(-1000, 5100) / 100;   // a random integer from -10 to 50
 
     // Check if any reads failed and exit early (to try again).
     if (isnan(h) || isnan(t)) {
