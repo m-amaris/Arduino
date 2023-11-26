@@ -31,10 +31,8 @@ int estadoPersiana = 0;  // 0 - Parar, 1 - Subir, 2 - Bajar
 bool pulsadorEstabaPresionado = false;
 
 // Variables de WIFI
-//const char* ssid = "LABDTE";
-//const char* password = "envev1d0s";
-const char* ssid     = "ASUS"; // Establecer SSID red WiFi de tu casa 
-const char* password = "VIVAlosQUINTOSdel70!!!"; // Establecer contraseña red WiFi de tu casa
+const char* ssid = "LABDTE";
+const char* password = "envev1d0s";
 //IPAddress wifiIP(192, 168, 137, 252);
 //IPAddress wifiNET(255, 254, 0, 0);
 //IPAddress wifiON(10, 48, 0, 1);
@@ -97,8 +95,8 @@ void loop() {
 
 void conectarWifi() {
   delay(10);
-  WiFi.mode(WIFI_STA);
-  WiFi.config(wifiIP, wifiON, wifiNET);
+  //WiFi.mode(WIFI_STA);
+  //WiFi.config(wifiIP, wifiON, wifiNET);
   WiFi.begin(ssid, password);
   Serial.printf("Conectando a la wifi con SSID %s y clave %s", ssid, password);
 
@@ -200,10 +198,10 @@ void manejadorApagarEnchufe() {
 void manejadorEstadoEnchufe() {
   if (estadoEnchufe) {
     Serial.println("[HTTP] Actuador de enchufe: recibida orden de petición de estado: encendido");
-    server.send(200, "text/plain", "encendido");
+    server.send(200, "text/plain", "encender");
   } else {
     Serial.println("[HTTP] Actuador de enchufe: recibida orden de petición de estado: apagado");
-    server.send(200, "text/plain", "apagado");
+    server.send(200, "text/plain", "apagar");
   }
 }
 
