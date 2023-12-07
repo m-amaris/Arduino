@@ -1,0 +1,12 @@
+1701128829: mosquitto version 2.0.18 starting
+1701128829: Config loaded from /mosquitto/config/mosquitto.conf.
+1701128829: Opening ipv4 listen socket on port 1883.
+1701128829: mosquitto version 2.0.18 running
+1701129039: mosquitto version 2.0.18 terminating
+1701129039: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1701129063: mosquitto version 2.0.18 starting
+1701129063: Config loaded from /mosquitto/config/mosquitto.conf.
+1701129063: Opening ipv4 listen socket on port 1883.
+1701129063: mosquitto version 2.0.18 running
+1701129189: New connection from 172.24.0.1:45588 on port 1883.
+1701129189: New client connected from 172.24.0.1:45588 as mqtt-explorer-55ed7fe1 (p2, c1, k60).
