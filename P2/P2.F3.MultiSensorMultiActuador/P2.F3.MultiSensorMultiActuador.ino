@@ -10,10 +10,8 @@
 */
 
 #include <WiFi.h>
-#include <WebServer.h>
-#include <DHT.h>           // Biblioteca para el sensor DHT11
-#include <HTTPClient.h>
 #include <PubSubClient.h>  // Biblioteca para el cliente MQTT
+#include <DHT.h>           // Biblioteca para el sensor DHT11
 
 /* Definición de constantes y variables COMUNES al multiactuador y multisensor*/
 #define ENCENDER HIGH
@@ -24,14 +22,12 @@ const int ESTADO_ENCENDIDO = HIGH;
 // Parámetros de la red wifi
 const char *ssid = "iPhone de Miguel";
 const char *password = "envev1d0s";
-//const char* ssid = "MOVISTAR_1E94";
-//const char* password = "E25AA1FEFBC47165CE1F";
 
 // Definición de las variables wifi y mqtt
 IPAddress wifiIP(10, 49, 33, 81);         // IP de la ESP8266
-IPAddress wifiNET(255, 254, 0, 0);        // Máscara de red
+IPAddress wifiNET(255, 255, 255, 0);        // Máscara de red
 IPAddress wifiON(10, 48, 0, 1);           // Dirección IP del encaminador
-IPAddress mqtt_server(172,20,10,8);  //IP del broker
+IPAddress mqtt_server(172, 20, 10, 8);
 WiFiClient clienteWIFI;
 
 #define MSG_BUFFER_SIZE (50)
@@ -76,16 +72,12 @@ bool pulsadorEstabaPresionado = false;
 #define DHTTYPE DHT11
 DHT dht(DHTPIN, DHTTYPE);
 long tiempoUltimoMensajeMultiSensor = 0;
-const String IPServidorWeb = "172.20.10.8";
-const String puerto = "8080";
-HTTPClient clienteHTTP; // Variable que se usará como cliente HTTP
+
 
 void setup() {
   Serial.begin(115200);
   Serial.println();
   Serial.println();
-  setup_actuador_enchufe();
-  setup_actuador_interruptor();
   setup_multisensor();
 
   conectar_WIFI();
@@ -94,14 +86,6 @@ void setup() {
   Serial.println("Inicialización del dispositivo terminada.");
 }
 
-void setup_actuador_enchufe() {
-  pinMode(PIN_ENCHUFE, OUTPUT);
-}
-
-void setup_actuador_interruptor() {
-  pinMode(PIN_INTERRUPTOR, OUTPUT);
-  pinMode(PIN_PULSADOR_INTERRUPTOR, INPUT_PULLUP);
-}
 
 void setup_multisensor() {
   dht.begin();
@@ -140,8 +124,6 @@ void configurar_MQTT() {
 
 void loop() {
   clienteMQTT.loop(); // Se comprueban mensajes entrantes
-  loop_actuador_enchufe();
-  loop_actuador_interruptor();
   loop_multiActuadorMQTT();
   loop_multiSensor();
 }
@@ -194,141 +176,8 @@ void manejador_mensajes(char *canal, byte *mensaje, unsigned int longitud) {
   Serial.println("--------");
   Serial.print("Ha llegado un mensaje para el canal: ");
   Serial.println(canal);
-  if (strcmp(canal, TOPIC_SUBSCRIPCION_ENCHUFE) == 0) {
-    tratamiento_mensaje_enchufe(mensaje, longitud);
-  } else if (strcmp(canal, TOPIC_SUBSCRIPCION_INTERRUPTOR) == 0) {
-    tratamiento_mensaje_interruptor(mensaje, longitud);
-  }
 }
 
-
-/*
-* Si el mensaje recibido corresponde al canal del enchufe esta funcion sera llamada
-* Segun el mensaje recibido se encendera o apagara el enchufe
-*/
-void tratamiento_mensaje_enchufe(byte *mensaje, unsigned int longitud) {
-
-  char bufferTemporal[MSG_BUFFER_SIZE];
-  strncpy(bufferTemporal, (char *)mensaje, longitud);
-  bufferTemporal[longitud] = '\0';
-
-  Serial.print("Mensaje recibido: ");
-  Serial.println(bufferTemporal);
-
-  if (strcmp(bufferTemporal, OPCION_ENCENDER) == 0) {
-    Serial.println("Se procede a encender el enchufe.");
-    estadoEnchufe = ESTADO_ENCENDIDO;
-  } else if (strcmp(bufferTemporal, OPCION_BLOQUEAR) == 0) {
-    Serial.println("Se procede a apagar el enchufe.");
-    estadoEnchufe = ESTADO_APAGADO;
-
-  } else {
-    Serial.println("*** ERROR ***. Formato del mensaje recibido erróneo.");
-  }
-  Serial.println("--------");
-}
-
-/*
-* Si el mensaje recibido corresponde al canal del interruptor esta funcion sera llamada
-* Segun el mensaje recibido se encendera o apagara el interruptor
-*/
-void tratamiento_mensaje_interruptor(byte *mensaje, unsigned int longitud) {
-
-  char bufferTemporal[MSG_BUFFER_SIZE];
-  strncpy(bufferTemporal, (char *)mensaje, longitud);
-  bufferTemporal[longitud] = '\0';
-
-  Serial.print("Mensaje recibido: ");
-  Serial.println(bufferTemporal);
-
-  if (strcmp(bufferTemporal, OPCION_ENCENDER) == 0) {
-    Serial.println("Se procede a encender el interruptor.");
-    estadoInterruptor = ESTADO_ENCENDIDO;
-  } else if (strcmp(bufferTemporal, OPCION_BLOQUEAR) == 0) {
-    Serial.println("Se procede a apagar el interruptor.");
-    estadoInterruptor = ESTADO_APAGADO;
-  } else {
-    Serial.println("*** ERROR ***. Formato del mensaje recibido erróneo.");
-  }
-  Serial.println("--------");
-}
-
-
-/* 
-* Función que se emplea para enviar por POST al Servidor Web el dato que se recibe como parámetro
-*/
-void envioDatoHTTPPost(String dato, String ruta) {
-  WiFiClient clienteWiFi;
-  if (!estoy_conectado())
-    conectar_WIFI(); // Si se ha perdido la conexión con la red WiFi se vuelve a establecer
-
-  if (clienteHTTP.begin(clienteWiFi, "http://" + IPServidorWeb + ":"+puerto+ruta)) {
-    Serial.print("...");
-    clienteHTTP.addHeader("Content-Type", "text/plain");  // Añadir cabecera a la petición POST
-    int httpCode = clienteHTTP.POST(dato);
-    // httpCode debe ser un valor positivo, en caso contrario es un error
-    if (httpCode > 0) {
-      // Si el servidor devuelve un código de que la petición es correcta
-      if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) {
-        String payload = clienteHTTP.getString();
-        Serial.println(payload);  // Se muestra por consola la respuesta del servidor
-      }
-    } else {
-      Serial.printf("[HTTP] POST... fallo, código de error: %s\n", clienteHTTP.errorToString(httpCode).c_str());
-    }
-    clienteHTTP.end();
-  } else {
-    Serial.printf("[HTTP} Falló la conexión HTTP\n");
-  }
-}
-
-/*
-* Funcion encargada de reflejar el estado del enchufe en el pin correspondiente
-*/
-void loop_actuador_enchufe() {
-  digitalWrite(PIN_ENCHUFE, estadoEnchufe);
-}
-
-/*
-* Funcion encargada de monitorear el estado del pulsador del interruptor y cambiar la variable de estado segun corresponda
-*/
-void loop_actuador_interruptor() {
-  int estadoPulsador = digitalRead(PIN_PULSADOR_INTERRUPTOR);
-
-  if (estadoPulsador == PULSADOR_ESTADO_ENCENDIDO && estadoPrevioPulsador == PULSADOR_ESTADO_APAGADO && !pulsadorEstabaPresionado) {
-    estadoInterruptor = !estadoInterruptor;
-    pulsadorEstabaPresionado = true;
-    Serial.println(estadoInterruptor == ESTADO_ENCENDIDO ? "Relé activado" : "Relé desactivado");
-  }
-  if (estadoPulsador == PULSADOR_ESTADO_APAGADO && pulsadorEstabaPresionado) {
-    pulsadorEstabaPresionado = false;
-  }
-
-  estadoPrevioPulsador = estadoPulsador;
-  digitalWrite(PIN_INTERRUPTOR, estadoInterruptor);
-  publicarEstadoPulsador();
-}
-
-/*
-* Funcion encargada de publicar en el topic correspondiente el estado del pulsador en intervalos designados
-*/
-void publicarEstadoPulsador() {
-  long now = millis();
-  if (now - tiempoUltimoMensajeMultiActuador > TIEMPO_ENTRE_MENSAJES) {
-    tiempoUltimoMensajeMultiActuador = now;  // Se actualiza el último mensaje a la referencia de tiempo actual
-    if (estadoInterruptor == ESTADO_ENCENDIDO) {
-      snprintf(mensaje, MSG_BUFFER_SIZE, "ON");
-    } else {
-      snprintf(mensaje, MSG_BUFFER_SIZE, "OFF");
-    }
-  
-    Serial.print("[MQTT] Enviar el dato ");
-    Serial.print(mensaje);
-    Serial.print(" al topic ");
-    Serial.println(TOPIC_PUBLICACION_INTERRUPTOR);
-    mqtt_EnviarMensaje(TOPIC_PUBLICACION_INTERRUPTOR);
-  }
-}
 
 void mqtt_EnviarMensaje(char *topic) {
   clienteMQTT.publish(topic, mensaje);
@@ -393,26 +242,5 @@ void loop_multiSensor() {
     Serial.print(" al topic ");
     Serial.println(TOPIC_PUBLICACION_DORMITORIO_SENSACION);
     mqtt_EnviarMensaje(TOPIC_PUBLICACION_DORMITORIO_SENSACION);
- 
-    Serial.print("[HTTP] Enviar el dato ");
-    sprintf(mensaje, "%.2f", t+1);
-    Serial.print(mensaje);
-    Serial.print(" al url ");
-    Serial.print("http://" + IPServidorWeb + ":"+puerto+RUTA_sensor_temperatura_salon);
-    envioDatoHTTPPost(mensaje,RUTA_sensor_temperatura_salon);
-
-    Serial.print("[HTTP] Enviar el dato ");
-    sprintf(mensaje, "%.2f", h+1);
-    Serial.print(mensaje);
-    Serial.print(" al url ");
-    Serial.print("http://" + IPServidorWeb + ":"+puerto+RUTA_sensor_humedad_salon);
-    envioDatoHTTPPost(mensaje,RUTA_sensor_humedad_salon);
-
-    Serial.print("[HTTP] Enviar el dato ");
-    sprintf(mensaje, "%.2f", hic+1);
-    Serial.print(mensaje);
-    Serial.print(" al url ");
-    Serial.print("http://" + IPServidorWeb + ":"+puerto+RUTA_sensor_sensacion_salon);
-    envioDatoHTTPPost(mensaje,RUTA_sensor_sensacion_salon);
   }
 }

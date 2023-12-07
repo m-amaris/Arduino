@@ -40,6 +40,8 @@ bool pulsadorEstabaPresionado = false;
 // Variables de WIFI
 const char* ssid = "iPhone de Miguel";
 const char* password = "envev1d0s";
+//const char* ssid = "MOVISTAR_1E94";
+//const char* password = "E25AA1FEFBC47165CE1F";
 IPAddress wifiIP(192,168,1,210);  // IP que se asignará al microcontrolador (debe ser una IP sin uso en la red)
 IPAddress wifiNET (255,255,255,0); // Máscara de Red
 IPAddress wifiON (192,168,1,1); // Dirección IP del router 

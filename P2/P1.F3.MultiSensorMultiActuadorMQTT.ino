@@ -22,16 +22,16 @@ const int ESTADO_APAGADO = LOW;
 const int ESTADO_ENCENDIDO = HIGH;
 
 // Parámetros de la red wifi
-const char *ssid = "iPhone de Miguel";
-const char *password = "envev1d0s";
-//const char* ssid = "MOVISTAR_1E94";
-//const char* password = "E25AA1FEFBC47165CE1F";
+// const char *ssid = "iPhone de Miguel";
+// const char *password = "envev1d0s";
+const char* ssid = "MOVISTAR_1E94";
+const char* password = "E25AA1FEFBC47165CE1F";
 
 // Definición de las variables wifi y mqtt
 IPAddress wifiIP(10, 49, 33, 81);         // IP de la ESP8266
 IPAddress wifiNET(255, 254, 0, 0);        // Máscara de red
 IPAddress wifiON(10, 48, 0, 1);           // Dirección IP del encaminador
-IPAddress mqtt_server(172,20,10,8);  //IP del broker
+IPAddress mqtt_server(192,168,1,42);  //IP del broker
 WiFiClient clienteWIFI;
 
 #define MSG_BUFFER_SIZE (50)
@@ -76,7 +76,7 @@ bool pulsadorEstabaPresionado = false;
 #define DHTTYPE DHT11
 DHT dht(DHTPIN, DHTTYPE);
 long tiempoUltimoMensajeMultiSensor = 0;
-const String IPServidorWeb = "172.20.10.8";
+const String IPServidorWeb = "192.168.1.42";
 const String puerto = "8080";
 HTTPClient clienteHTTP; // Variable que se usará como cliente HTTP
 
